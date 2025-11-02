@@ -24,21 +24,38 @@ class ImportCsvJob implements ShouldQueue
 
     public function handle(): void
     {
-        if (! $this->fileExists()) {
-            return;
+        if (! $this->isFileValid()) {
+            throw new \RuntimeException("CSV file is invalid or missing at {$this->filePath}");
         }
 
         $this->processFile();
     }
 
-    private function fileExists(): bool
+    private function isFileValid(): bool
     {
         if (! file_exists($this->filePath)) {
             info("[ImportCsvJob] CSV file not found at {$this->filePath}");
 
             return false;
         }
-        info("[ImportCsvJob] CSV file found at {$this->filePath}");
+
+        if (filesize($this->filePath) === 0) {
+            info("[ImportCsvJob] CSV file is empty: {$this->filePath}");
+
+            return false;
+        }
+
+        $handle = fopen($this->filePath, 'r');
+        $header = fgetcsv($handle);
+        fclose($handle);
+
+        if (empty($header)) {
+            info("[ImportCsvJob] CSV file has no header: {$this->filePath}");
+
+            return false;
+        }
+
+        info("[ImportCsvJob] CSV file is valid: {$this->filePath}");
 
         return true;
     }

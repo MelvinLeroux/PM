@@ -47,10 +47,25 @@ class ImportCsvChunkJob implements ShouldQueue
     {
         $errors = [];
 
+        $errors = array_merge($errors, $this->validateOrder($data, $index));
+        $errors = array_merge($errors, $this->validateProduct($data, $index));
+        $errors = array_merge($errors, $this->validateOrderInfo($data, $index));
+
+        if (! empty($errors)) {
+            Log::warning("Line {$index}: skipped due to errors: ".implode(', ', $errors));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function validateOrder(array $data, int $index): array
+    {
+        $errors = [];
         if (empty($data['order_id'])) {
             $errors[] = 'order_id missing';
         }
-
         if (empty($data['order_date'])) {
             $errors[] = 'order_date missing';
         } else {
@@ -60,36 +75,37 @@ class ImportCsvChunkJob implements ShouldQueue
                 $errors[] = 'invalid order_date';
             }
         }
-
-        if (empty($data['customer_email'])) {
-            $errors[] = 'customer_email missing';
-        } elseif (! filter_var($data['customer_email'], FILTER_VALIDATE_EMAIL)) {
+        if (empty($data['customer_email']) || ! filter_var($data['customer_email'], FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'invalid customer_email';
         }
 
+        return $errors;
+    }
+
+    private function validateProduct(array $data, int $index): array
+    {
+        $errors = [];
+        if (empty($data['product_sku'])) {
+            $errors[] = 'product_sku missing';
+        }
+        if (empty($data['product_name'])) {
+            $errors[] = 'product_name missing';
+        }
         if (! isset($data['unit_price']) || ! is_numeric($data['unit_price']) || $data['unit_price'] <= 0) {
             $errors[] = 'invalid unit_price';
         }
 
+        return $errors;
+    }
+
+    private function validateOrderInfo(array $data, int $index): array
+    {
+        $errors = [];
         if (! isset($data['quantity']) || ! is_numeric($data['quantity']) || $data['quantity'] <= 0) {
             $errors[] = 'invalid quantity';
         }
 
-        if (empty($data['product_sku'])) {
-            $errors[] = 'product_sku missing';
-        }
-
-        if (empty($data['product_name'])) {
-            $errors[] = 'product_name missing';
-        }
-
-        if (! empty($errors)) {
-            Log::warning("Line {$index}: skipped due to errors: ".implode(', ', $errors));
-
-            return false;
-        }
-
-        return true;
+        return $errors;
     }
 
     private function getOrCreateProduct(array $data, int $index): Product
